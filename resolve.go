@@ -114,6 +114,7 @@ func resolveDnsaddr(maddr ma.Multiaddr) ([]ma.Multiaddr, error) {
 		}
 
 		parts := ma.Split(rmaddr)
+		// XXX probably insecure
 		if ma.Join(parts[len(parts)-len(trailer):]...).Equal(ma.Join(trailer...)) {
 			result = append(result, rmaddr)
 		}

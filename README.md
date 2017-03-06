@@ -32,25 +32,26 @@ In more detail:
 # /dnsaddr resolves by looking up TXT records.
 
 > dig +short TXT _dnsaddr.example.net
-"/ip6/2001:db8::a3/tcp/443/wss/ipfs/Qmfoo"
-"/ip6/2001:db8::a4/tcp/443/wss/ipfs/Qmbar"
-"/ip4/192.0.2.1/tcp/443/wss/ipfs/Qmfoo"
-"/ip4/192.0.2.2/tcp/443/wss/ipfs/Qmbar"
+"dnslink=/ip6/2001:db8::a3/tcp/443/wss/ipfs/Qmfoo"
+"dnslink=/ip6/2001:db8::a4/tcp/443/wss/ipfs/Qmbar"
+"dnslink=/ip4/192.0.2.1/tcp/443/wss/ipfs/Qmfoo"
+"dnslink=/ip4/192.0.2.2/tcp/443/wss/ipfs/Qmbar"
 ...
 
 # /dnsaddr returns addrs which encapsulate whatever /dnsaddr encapsulates too.
 
-> madns /dnsaddr/example.net/ipfs/Qmfoo
+> madns example.net/ipfs/Qmfoo
+info: changing query to /dnsaddr/example.net/ipfs/Qmfoo
 /ip6/2001:db8::a3/tcp/443/wss/ipfs/Qmfoo
 /ip4/192.0.2.1/tcp/443/wss/ipfs/Qmfoo
 
-# /dnsaddr with `-p` filters by protocol stacks.
+# TODO -p filters by protocol stacks.
 
 > madns -p /ip6/tcp/wss /dnsaddr/example.net
 /ip6/2001:db8::a3/tcp/443/wss/ipfs/Qmfoo
 /ip6/2001:db8::a4/tcp/443/wss/ipfs/Qmbar
 
-# /dnsaddr with `-c` filters by CIDR
+# TOOD -c filters by CIDR
 > madns -c /ip4/104.236.76.0/ipcidr/24 /dnsaddr/example.net
 /ip4/192.0.2.2/tcp/443/wss/ipfs/Qmbar
 ```
