@@ -47,8 +47,11 @@ func resolveDns4(maddr ma.Multiaddr) ([]ma.Multiaddr, error) {
 
 	encap := ma.Split(maddr)[1:]
 
-	records, err := net.LookupIP(value)
 	result := []ma.Multiaddr{}
+	records, err := net.LookupIP(value)
+	if err != nil {
+		return result, err
+	}
 
 	for _, r := range records {
 		ip4 := r.To4()
@@ -73,8 +76,11 @@ func resolveDns6(maddr ma.Multiaddr) ([]ma.Multiaddr, error) {
 
 	encap := ma.Split(maddr)[1:]
 
-	records, err := net.LookupIP(value)
 	result := []ma.Multiaddr{}
+	records, err := net.LookupIP(value)
+	if err != nil {
+		return result, err
+	}
 
 	for _, r := range records {
 		ip6 := r.To16()
@@ -99,8 +105,11 @@ func resolveDnsaddr(maddr ma.Multiaddr) ([]ma.Multiaddr, error) {
 
 	trailer := ma.Split(maddr)[1:]
 
-	records, err := net.LookupTXT("_dnsaddr." + value)
 	result := []ma.Multiaddr{}
+	records, err := net.LookupTXT("_dnsaddr." + value)
+	if err != nil {
+		return result, err
+	}
 
 	for _, r := range records {
 		rv := strings.Split(r, "dnsaddr=")
