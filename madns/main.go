@@ -10,6 +10,15 @@ import (
 )
 
 func main() {
+	if len(os.Args) != 2 {
+		fmt.Print("usage: madns /dnsaddr/example.com\n" +
+			"       madns /dnsaddr/example.com/ipfs/Qmfoobar\n" +
+			"       madns /dns6/example.com\n" +
+			"       madns /dns6/example.com/tcp/443/wss\n" +
+			"       madns /dns4/example.com\n")
+		os.Exit(1)
+	}
+
 	query := os.Args[1]
 	if !strings.HasPrefix(query, "/") {
 		query = "/dnsaddr/" + query
