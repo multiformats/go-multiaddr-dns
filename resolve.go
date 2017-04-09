@@ -122,11 +122,18 @@ func resolveDnsaddr(maddr ma.Multiaddr) ([]ma.Multiaddr, error) {
 			return result, err
 		}
 
-		parts := ma.Split(rmaddr)
-		// XXX probably insecure
-		if ma.Join(parts[len(parts)-len(trailer):]...).Equal(ma.Join(trailer...)) {
+		if matchDnsaddr(rmaddr, trailer) {
 			result = append(result, rmaddr)
 		}
 	}
 	return result, nil
+}
+
+// XXX probably insecure
+func matchDnsaddr(maddr ma.Multiaddr, trailer []ma.Multiaddr) bool {
+	parts := ma.Split(maddr)
+	if ma.Join(parts[len(parts)-len(trailer):]...).Equal(ma.Join(trailer...)) {
+		return true
+	}
+	return false
 }
