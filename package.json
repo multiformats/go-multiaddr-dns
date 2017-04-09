@@ -15,7 +15,7 @@
   "gxVersion": "0.10.0",
   "language": "go",
   "license": "MIT",
-  "name": "madns",
+  "name": "go-multiaddr-dns",
   "releaseCmd": "git commit -a -m \"gx publish $VERSION\"",
   "version": "0.0.0"
 }
