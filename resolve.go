@@ -1,6 +1,7 @@
 package madns
 
 import (
+	"context"
 	"fmt"
 	"net"
 	"strings"
@@ -10,36 +11,41 @@ import (
 
 var ResolvableProtocols = []ma.Protocol{DnsaddrProtocol, Dns4Protocol, Dns6Protocol}
 
-func Resolve(maddr ma.Multiaddr) ([]ma.Multiaddr, error) {
-	protos := maddr.Protocols()
-	if len(protos) == 0 {
-		return []ma.Multiaddr{maddr}, nil
-	}
+type resolver interface {
+	LookupIPAddr(context.Context, string) ([]net.IPAddr, error)
+	LookupTXT(context.Context, string) ([]string, error)
+}
 
-	resolvable := false
-	for _, p := range ResolvableProtocols {
-		if protos[0].Code == p.Code {
-			resolvable = true
-		}
-	}
+type Resolver struct {
+	Resolver resolver
+}
+
+var DefaultResolver = &Resolver{Resolver: net.DefaultResolver}
+
+func Resolve(ctx context.Context, maddr ma.Multiaddr) ([]ma.Multiaddr, error) {
+	return DefaultResolver.Resolve(ctx, maddr)
+}
+
+func (r *Resolver) Resolve(ctx context.Context, maddr ma.Multiaddr) ([]ma.Multiaddr, error) {
+	resolvable, proto := isResolvable(maddr)
 	if !resolvable {
 		return []ma.Multiaddr{maddr}, nil
 	}
 
-	if protos[0].Code == Dns4Protocol.Code {
-		return resolveDns4(maddr)
+	if proto.Code == Dns4Protocol.Code {
+		return r.resolveDns4(ctx, maddr)
 	}
-	if protos[0].Code == Dns6Protocol.Code {
-		return resolveDns6(maddr)
+	if proto.Code == Dns6Protocol.Code {
+		return r.resolveDns6(ctx, maddr)
 	}
-	if protos[0].Code == DnsaddrProtocol.Code {
-		return resolveDnsaddr(maddr)
+	if proto.Code == DnsaddrProtocol.Code {
+		return r.resolveDnsaddr(ctx, maddr)
 	}
 
 	panic("unreachable")
 }
 
-func resolveDns4(maddr ma.Multiaddr) ([]ma.Multiaddr, error) {
+func (r *Resolver) resolveDns4(ctx context.Context, maddr ma.Multiaddr) ([]ma.Multiaddr, error) {
 	value, err := maddr.ValueForProtocol(Dns4Protocol.Code)
 	if err != nil {
 		return nil, fmt.Errorf("error resolving %s: %s", maddr.String(), err)
@@ -48,13 +54,13 @@ func resolveDns4(maddr ma.Multiaddr) ([]ma.Multiaddr, error) {
 	encap := ma.Split(maddr)[1:]
 
 	result := []ma.Multiaddr{}
-	records, err := net.LookupIP(value)
+	records, err := r.Resolver.LookupIPAddr(ctx, value)
 	if err != nil {
 		return result, err
 	}
 
 	for _, r := range records {
-		ip4 := r.To4()
+		ip4 := r.IP.To4()
 		if ip4 == nil {
 			continue
 		}
@@ -68,7 +74,7 @@ func resolveDns4(maddr ma.Multiaddr) ([]ma.Multiaddr, error) {
 	return result, nil
 }
 
-func resolveDns6(maddr ma.Multiaddr) ([]ma.Multiaddr, error) {
+func (r *Resolver) resolveDns6(ctx context.Context, maddr ma.Multiaddr) ([]ma.Multiaddr, error) {
 	value, err := maddr.ValueForProtocol(Dns6Protocol.Code)
 	if err != nil {
 		return nil, fmt.Errorf("error resolving %s: %s", maddr.String(), err)
@@ -77,17 +83,16 @@ func resolveDns6(maddr ma.Multiaddr) ([]ma.Multiaddr, error) {
 	encap := ma.Split(maddr)[1:]
 
 	result := []ma.Multiaddr{}
-	records, err := net.LookupIP(value)
+	records, err := r.Resolver.LookupIPAddr(ctx, value)
 	if err != nil {
 		return result, err
 	}
 
 	for _, r := range records {
-		ip6 := r.To16()
-		if r.To4() != nil {
+		if r.IP.To4() != nil {
 			continue
 		}
-		ip6maddr, err := ma.NewMultiaddr("/ip6/" + ip6.String())
+		ip6maddr, err := ma.NewMultiaddr("/ip6/" + r.IP.To16().String())
 		if err != nil {
 			return result, err
 		}
@@ -97,7 +102,7 @@ func resolveDns6(maddr ma.Multiaddr) ([]ma.Multiaddr, error) {
 	return result, nil
 }
 
-func resolveDnsaddr(maddr ma.Multiaddr) ([]ma.Multiaddr, error) {
+func (r *Resolver) resolveDnsaddr(ctx context.Context, maddr ma.Multiaddr) ([]ma.Multiaddr, error) {
 	value, err := maddr.ValueForProtocol(DnsaddrProtocol.Code)
 	if err != nil {
 		return nil, fmt.Errorf("error resolving %s: %s", maddr.String(), err)
@@ -106,7 +111,7 @@ func resolveDnsaddr(maddr ma.Multiaddr) ([]ma.Multiaddr, error) {
 	trailer := ma.Split(maddr)[1:]
 
 	result := []ma.Multiaddr{}
-	records, err := net.LookupTXT("_dnsaddr." + value)
+	records, err := r.Resolver.LookupTXT(ctx, "_dnsaddr."+value)
 	if err != nil {
 		return result, err
 	}
@@ -127,6 +132,21 @@ func resolveDnsaddr(maddr ma.Multiaddr) ([]ma.Multiaddr, error) {
 		}
 	}
 	return result, nil
+}
+
+func isResolvable(maddr ma.Multiaddr) (bool, *ma.Protocol) {
+	protos := maddr.Protocols()
+	if len(protos) == 0 {
+		return false, nil
+	}
+
+	for _, p := range ResolvableProtocols {
+		if protos[0].Code == p.Code {
+			return true, &p
+		}
+	}
+
+	return false, nil
 }
 
 // XXX probably insecure

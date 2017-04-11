@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"fmt"
 	"os"
 	"strings"
@@ -31,9 +32,9 @@ func main() {
 		os.Exit(1)
 	}
 
-	rmaddrs, err := madns.Resolve(maddr)
+	rmaddrs, err := madns.Resolve(context.Background(), maddr)
 	if err != nil {
-		fmt.Printf("error: %s\n", err)
+		fmt.Printf("error: %s (result=%+v)\n", err, rmaddrs)
 		os.Exit(1)
 	}
 
