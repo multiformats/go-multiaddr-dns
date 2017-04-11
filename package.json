@@ -19,6 +19,6 @@
   "license": "MIT",
   "name": "go-multiaddr-dns",
   "releaseCmd": "git commit -a -m \"gx publish $VERSION\"",
-  "version": "0.1.2"
+  "version": "0.1.3"
 }
 
