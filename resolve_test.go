@@ -8,29 +8,6 @@ import (
 	ma "github.com/multiformats/go-multiaddr"
 )
 
-type mockResolver struct {
-	IP  map[string][]net.IPAddr
-	TXT map[string][]string
-}
-
-func (r *mockResolver) LookupIPAddr(ctx context.Context, name string) ([]net.IPAddr, error) {
-	results, ok := r.IP[name]
-	if ok {
-		return results, nil
-	} else {
-		return []net.IPAddr{}, nil
-	}
-}
-
-func (r *mockResolver) LookupTXT(ctx context.Context, name string) ([]string, error) {
-	results, ok := r.TXT[name]
-	if ok {
-		return results, nil
-	} else {
-		return []string{}, nil
-	}
-}
-
 var ip4a = net.IPAddr{IP: net.ParseIP("192.0.2.1")}
 var ip4b = net.IPAddr{IP: net.ParseIP("192.0.2.2")}
 var ip6a = net.IPAddr{IP: net.ParseIP("2001:db8::a3")}
@@ -52,7 +29,7 @@ var txtd = "dnsaddr=" + txtmd.String()
 var txte = "dnsaddr=" + txtme.String()
 
 func makeResolver() *Resolver {
-	mock := &mockResolver{
+	mock := &MockBackend{
 		IP: map[string][]net.IPAddr{
 			"example.com": []net.IPAddr{ip4a, ip4b, ip6a, ip6b},
 		},
@@ -61,7 +38,7 @@ func makeResolver() *Resolver {
 			"_dnsaddr.matching.com": []string{txtc, txtd, txte},
 		},
 	}
-	resolver := &Resolver{Resolver: mock}
+	resolver := &Resolver{Backend: mock}
 	return resolver
 }
 

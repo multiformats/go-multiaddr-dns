@@ -10,17 +10,39 @@ import (
 )
 
 var ResolvableProtocols = []ma.Protocol{DnsaddrProtocol, Dns4Protocol, Dns6Protocol}
+var DefaultResolver = &Resolver{Backend: net.DefaultResolver}
 
-type resolver interface {
+type backend interface {
 	LookupIPAddr(context.Context, string) ([]net.IPAddr, error)
 	LookupTXT(context.Context, string) ([]string, error)
 }
 
 type Resolver struct {
-	Resolver resolver
+	Backend backend
 }
 
-var DefaultResolver = &Resolver{Resolver: net.DefaultResolver}
+type MockBackend struct {
+	IP  map[string][]net.IPAddr
+	TXT map[string][]string
+}
+
+func (r *MockBackend) LookupIPAddr(ctx context.Context, name string) ([]net.IPAddr, error) {
+	results, ok := r.IP[name]
+	if ok {
+		return results, nil
+	} else {
+		return []net.IPAddr{}, nil
+	}
+}
+
+func (r *MockBackend) LookupTXT(ctx context.Context, name string) ([]string, error) {
+	results, ok := r.TXT[name]
+	if ok {
+		return results, nil
+	} else {
+		return []string{}, nil
+	}
+}
 
 func Resolve(ctx context.Context, maddr ma.Multiaddr) ([]ma.Multiaddr, error) {
 	return DefaultResolver.Resolve(ctx, maddr)
@@ -54,7 +76,7 @@ func (r *Resolver) resolveDns4(ctx context.Context, maddr ma.Multiaddr) ([]ma.Mu
 	encap := ma.Split(maddr)[1:]
 
 	result := []ma.Multiaddr{}
-	records, err := r.Resolver.LookupIPAddr(ctx, value)
+	records, err := r.Backend.LookupIPAddr(ctx, value)
 	if err != nil {
 		return result, err
 	}
@@ -83,7 +105,7 @@ func (r *Resolver) resolveDns6(ctx context.Context, maddr ma.Multiaddr) ([]ma.Mu
 	encap := ma.Split(maddr)[1:]
 
 	result := []ma.Multiaddr{}
-	records, err := r.Resolver.LookupIPAddr(ctx, value)
+	records, err := r.Backend.LookupIPAddr(ctx, value)
 	if err != nil {
 		return result, err
 	}
@@ -111,7 +133,7 @@ func (r *Resolver) resolveDnsaddr(ctx context.Context, maddr ma.Multiaddr) ([]ma
 	trailer := ma.Split(maddr)[1:]
 
 	result := []ma.Multiaddr{}
-	records, err := r.Resolver.LookupTXT(ctx, "_dnsaddr."+value)
+	records, err := r.Backend.LookupTXT(ctx, "_dnsaddr."+value)
 	if err != nil {
 		return result, err
 	}
