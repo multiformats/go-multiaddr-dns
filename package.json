@@ -3,7 +3,9 @@
   "bugs": {
     "url": "https://github.com/multiformats/go-multiaddr-dns/issues"
   },
-  "gx": {},
+  "gx": {
+    "dvcsimport": "github.com/multiformats/go-multiaddr-dns"
+  },
   "gxDependencies": [
     {
       "author": "multiformats",
