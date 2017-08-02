@@ -32,10 +32,10 @@ In more detail:
 # /dnsaddr resolves by looking up TXT records.
 
 > dig +short TXT _dnsaddr.example.net
-"dnslink=/ip6/2001:db8::a3/tcp/443/wss/ipfs/Qmfoo"
-"dnslink=/ip6/2001:db8::a4/tcp/443/wss/ipfs/Qmbar"
-"dnslink=/ip4/192.0.2.1/tcp/443/wss/ipfs/Qmfoo"
-"dnslink=/ip4/192.0.2.2/tcp/443/wss/ipfs/Qmbar"
+"dnsaddr=/ip6/2001:db8::a3/tcp/443/wss/ipfs/Qmfoo"
+"dnsaddr=/ip6/2001:db8::a4/tcp/443/wss/ipfs/Qmbar"
+"dnsaddr=/ip4/192.0.2.1/tcp/443/wss/ipfs/Qmfoo"
+"dnsaddr=/ip4/192.0.2.2/tcp/443/wss/ipfs/Qmbar"
 ...
 
 # /dnsaddr returns addrs which encapsulate whatever /dnsaddr encapsulates too.
