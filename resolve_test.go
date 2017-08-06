@@ -42,6 +42,21 @@ func makeResolver() *Resolver {
 	return resolver
 }
 
+func TestMatches(t *testing.T) {
+	if !Matches(ma.StringCast("/dns4/example.com")) {
+		t.Fatalf("expected match, didn't: /dns4/example.com")
+	}
+	if !Matches(ma.StringCast("/dns6/example.com")) {
+		t.Fatalf("expected match, didn't: /dns6/example.com")
+	}
+	if !Matches(ma.StringCast("/dnsaddr/example.com")) {
+		t.Fatalf("expected match, didn't: /dnsaddr/example.com")
+	}
+	if Matches(ip4ma) {
+		t.Fatalf("expected no-match, but did: %s", ip4ma.String())
+	}
+}
+
 func TestSimpleIPResolve(t *testing.T) {
 	ctx := context.Background()
 	resolver := makeResolver()

@@ -44,23 +44,38 @@ func (r *MockBackend) LookupTXT(ctx context.Context, name string) ([]string, err
 	}
 }
 
+func Matches(maddr ma.Multiaddr) bool {
+	protos := maddr.Protocols()
+	if len(protos) == 0 {
+		return false
+	}
+
+	for _, p := range ResolvableProtocols {
+		if protos[0].Code == p.Code {
+			return true
+		}
+	}
+
+	return false
+}
+
 func Resolve(ctx context.Context, maddr ma.Multiaddr) ([]ma.Multiaddr, error) {
 	return DefaultResolver.Resolve(ctx, maddr)
 }
 
 func (r *Resolver) Resolve(ctx context.Context, maddr ma.Multiaddr) ([]ma.Multiaddr, error) {
-	resolvable, proto := isResolvable(maddr)
-	if !resolvable {
+	if !Matches(maddr) {
 		return []ma.Multiaddr{maddr}, nil
 	}
 
-	if proto.Code == Dns4Protocol.Code {
+	protos := maddr.Protocols()
+	if protos[0].Code == Dns4Protocol.Code {
 		return r.resolveDns4(ctx, maddr)
 	}
-	if proto.Code == Dns6Protocol.Code {
+	if protos[0].Code == Dns6Protocol.Code {
 		return r.resolveDns6(ctx, maddr)
 	}
-	if proto.Code == DnsaddrProtocol.Code {
+	if protos[0].Code == DnsaddrProtocol.Code {
 		return r.resolveDnsaddr(ctx, maddr)
 	}
 
@@ -154,21 +169,6 @@ func (r *Resolver) resolveDnsaddr(ctx context.Context, maddr ma.Multiaddr) ([]ma
 		}
 	}
 	return result, nil
-}
-
-func isResolvable(maddr ma.Multiaddr) (bool, *ma.Protocol) {
-	protos := maddr.Protocols()
-	if len(protos) == 0 {
-		return false, nil
-	}
-
-	for _, p := range ResolvableProtocols {
-		if protos[0].Code == p.Code {
-			return true, &p
-		}
-	}
-
-	return false, nil
 }
 
 // XXX probably insecure
