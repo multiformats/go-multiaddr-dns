@@ -7,11 +7,7 @@ import (
 	ma "github.com/multiformats/go-multiaddr"
 )
 
-// You **MUST** register your multicodecs with
-// https://github.com/multiformats/multicodec before adding them here.
-//
-// TODO: Use a single source of truth for all multicodecs instead of
-// distributing them like this...
+// Extracted from source of truth for multicodec codes: https://github.com/multiformats/multicodec
 const (
 	P_DNS4    = 0x0036
 	P_DNS6    = 0x0037
