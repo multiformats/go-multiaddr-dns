@@ -8,7 +8,7 @@ import (
 	ma "github.com/multiformats/go-multiaddr"
 )
 
-var ResolvableProtocols = []ma.Protocol{DnsaddrProtocol, Dns4Protocol, Dns6Protocol}
+var ResolvableProtocols = []ma.Protocol{DnsaddrProtocol, Dns4Protocol, Dns6Protocol, DnsProtocol}
 var DefaultResolver = &Resolver{Backend: net.DefaultResolver}
 
 const dnsaddrTXTPrefix = "dnsaddr="
@@ -48,7 +48,7 @@ func (r *MockBackend) LookupTXT(ctx context.Context, name string) ([]string, err
 func Matches(maddr ma.Multiaddr) (matches bool) {
 	ma.ForEach(maddr, func(c ma.Component) bool {
 		switch c.Protocol().Code {
-		case Dns4Protocol.Code, Dns6Protocol.Code, DnsaddrProtocol.Code:
+		case DnsProtocol.Code, Dns4Protocol.Code, Dns6Protocol.Code, DnsaddrProtocol.Code:
 			matches = true
 		}
 		return !matches
@@ -66,7 +66,7 @@ func (r *Resolver) Resolve(ctx context.Context, maddr ma.Multiaddr) ([]ma.Multia
 		var keep ma.Multiaddr
 		keep, maddr = ma.SplitFunc(maddr, func(c ma.Component) bool {
 			switch c.Protocol().Code {
-			case Dns4Protocol.Code, Dns6Protocol.Code, DnsaddrProtocol.Code:
+			case DnsProtocol.Code, Dns4Protocol.Code, Dns6Protocol.Code, DnsaddrProtocol.Code:
 				return true
 			default:
 				return false
@@ -97,8 +97,9 @@ func (r *Resolver) Resolve(ctx context.Context, maddr ma.Multiaddr) ([]ma.Multia
 
 		var resolved []ma.Multiaddr
 		switch proto.Code {
-		case Dns4Protocol.Code, Dns6Protocol.Code:
-			v4 := proto.Code == Dns4Protocol.Code
+		case Dns4Protocol.Code, Dns6Protocol.Code, DnsProtocol.Code:
+			v4only := proto.Code == Dns4Protocol.Code
+			v6only := proto.Code == Dns6Protocol.Code
 
 			// XXX: Unfortunately, go does a pretty terrible job of
 			// differentiating between IPv6 and IPv4. A v4-in-v6
@@ -115,16 +116,16 @@ func (r *Resolver) Resolve(ctx context.Context, maddr ma.Multiaddr) ([]ma.Multia
 					err    error
 				)
 				ip4 := r.IP.To4()
-				if v4 {
-					if ip4 == nil {
-						continue
-					}
-					rmaddr, err = ma.NewMultiaddr("/ip4/" + ip4.String())
-				} else {
-					if ip4 != nil {
+				if ip4 == nil {
+					if v4only {
 						continue
 					}
 					rmaddr, err = ma.NewMultiaddr("/ip6/" + r.IP.String())
+				} else {
+					if v6only {
+						continue
+					}
+					rmaddr, err = ma.NewMultiaddr("/ip4/" + ip4.String())
 				}
 				if err != nil {
 					return nil, err

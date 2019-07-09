@@ -48,6 +48,9 @@ func TestMatches(t *testing.T) {
 		// need to depend on the circuit package to parse it.
 		t.Fatalf("expected match, didn't: /tcp/1234/dns6/example.com")
 	}
+	if !Matches(ma.StringCast("/dns/example.com")) {
+		t.Fatalf("expected match, didn't: /dns/example.com")
+	}
 	if !Matches(ma.StringCast("/dns4/example.com")) {
 		t.Fatalf("expected match, didn't: /dns4/example.com")
 	}
@@ -80,6 +83,16 @@ func TestSimpleIPResolve(t *testing.T) {
 	}
 	if len(addrs6) != 2 || !addrs6[0].Equal(ip6ma) || addrs6[0].Equal(ip6mb) {
 		t.Fatalf("expected [%s %s], got %+v", ip6ma, ip6mb, addrs6)
+	}
+
+	addrs, err := resolver.Resolve(ctx, ma.StringCast("/dns/example.com"))
+	if err != nil {
+		t.Error(err)
+	}
+	for i, expected := range []ma.Multiaddr{ip4ma, ip4mb, ip6ma, ip6mb} {
+		if !expected.Equal(addrs[i]) {
+			t.Fatalf("%d: expected %s, got %s", i, expected, addrs[i])
+		}
 	}
 }
 
