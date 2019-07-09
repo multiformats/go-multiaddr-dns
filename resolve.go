@@ -2,7 +2,6 @@ package madns
 
 import (
 	"context"
-	"fmt"
 	"net"
 	"strings"
 
@@ -11,6 +10,8 @@ import (
 
 var ResolvableProtocols = []ma.Protocol{DnsaddrProtocol, Dns4Protocol, Dns6Protocol}
 var DefaultResolver = &Resolver{Backend: net.DefaultResolver}
+
+const dnsaddrTXTPrefix = "dnsaddr="
 
 type backend interface {
 	LookupIPAddr(context.Context, string) ([]net.IPAddr, error)
@@ -44,19 +45,15 @@ func (r *MockBackend) LookupTXT(ctx context.Context, name string) ([]string, err
 	}
 }
 
-func Matches(maddr ma.Multiaddr) bool {
-	protos := maddr.Protocols()
-	if len(protos) == 0 {
-		return false
-	}
-
-	for _, p := range ResolvableProtocols {
-		if protos[0].Code == p.Code {
-			return true
+func Matches(maddr ma.Multiaddr) (matches bool) {
+	ma.ForEach(maddr, func(c ma.Component) bool {
+		switch c.Protocol().Code {
+		case Dns4Protocol.Code, Dns6Protocol.Code, DnsaddrProtocol.Code:
+			matches = true
 		}
-	}
-
-	return false
+		return !matches
+	})
+	return matches
 }
 
 func Resolve(ctx context.Context, maddr ma.Multiaddr) ([]ma.Multiaddr, error) {
@@ -64,121 +61,162 @@ func Resolve(ctx context.Context, maddr ma.Multiaddr) ([]ma.Multiaddr, error) {
 }
 
 func (r *Resolver) Resolve(ctx context.Context, maddr ma.Multiaddr) ([]ma.Multiaddr, error) {
-	if !Matches(maddr) {
-		return []ma.Multiaddr{maddr}, nil
-	}
+	var results []ma.Multiaddr
+	for i := 0; maddr != nil; i++ {
+		var keep ma.Multiaddr
+		keep, maddr = ma.SplitFunc(maddr, func(c ma.Component) bool {
+			switch c.Protocol().Code {
+			case Dns4Protocol.Code, Dns6Protocol.Code, DnsaddrProtocol.Code:
+				return true
+			default:
+				return false
+			}
+		})
 
-	protos := maddr.Protocols()
-	if protos[0].Code == Dns4Protocol.Code {
-		return r.resolveDns4(ctx, maddr)
-	}
-	if protos[0].Code == Dns6Protocol.Code {
-		return r.resolveDns6(ctx, maddr)
-	}
-	if protos[0].Code == DnsaddrProtocol.Code {
-		return r.resolveDnsaddr(ctx, maddr)
-	}
+		// Append the part we're keeping.
+		if keep != nil {
+			if results == nil {
+				results = append(results, keep)
+			} else {
+				for i, r := range results {
+					results[i] = r.Encapsulate(keep)
+				}
+			}
+		}
 
-	panic("unreachable")
+		// Check to see if we're done.
+		if maddr == nil {
+			break
+		}
+
+		var resolve *ma.Component
+		resolve, maddr = ma.SplitFirst(maddr)
+
+		proto := resolve.Protocol()
+		value := resolve.Value()
+
+		var resolved []ma.Multiaddr
+		switch proto.Code {
+		case Dns4Protocol.Code, Dns6Protocol.Code:
+			v4 := proto.Code == Dns4Protocol.Code
+
+			// XXX: Unfortunately, go does a pretty terrible job of
+			// differentiating between IPv6 and IPv4. A v4-in-v6
+			// AAAA record will _look_ like an A record to us and
+			// there's nothing we can do about that.
+			records, err := r.Backend.LookupIPAddr(ctx, value)
+			if err != nil {
+				return nil, err
+			}
+
+			for _, r := range records {
+				var (
+					rmaddr ma.Multiaddr
+					err    error
+				)
+				ip4 := r.IP.To4()
+				if v4 {
+					if ip4 == nil {
+						continue
+					}
+					rmaddr, err = ma.NewMultiaddr("/ip4/" + ip4.String())
+				} else {
+					if ip4 != nil {
+						continue
+					}
+					rmaddr, err = ma.NewMultiaddr("/ip6/" + r.IP.String())
+				}
+				if err != nil {
+					return nil, err
+				}
+				resolved = append(resolved, rmaddr)
+			}
+		case DnsaddrProtocol.Code:
+			records, err := r.Backend.LookupTXT(ctx, "_dnsaddr."+value)
+			if err != nil {
+				return nil, err
+			}
+
+			length := 0
+			if maddr != nil {
+				length = addrLen(maddr)
+			}
+			for _, r := range records {
+				if !strings.HasPrefix(r, dnsaddrTXTPrefix) {
+					continue
+				}
+				rmaddr, err := ma.NewMultiaddr(r[len(dnsaddrTXTPrefix):])
+				if err != nil {
+					// discard multiaddrs we don't understand.
+					// XXX: Is this right?
+					continue
+				}
+
+				if maddr != nil {
+					rmlen := addrLen(rmaddr)
+					if rmlen < length {
+						// not long enough.
+						continue
+					}
+
+					// Matches everything after the /dnsaddr/... with the end of the
+					// dnsaddr record:
+					//
+					// v----------rmlen-----------------v
+					// /ip4/1.2.3.4/tcp/1234/p2p/QmFoobar
+					//                      /p2p/QmFoobar
+					// ^--(rmlen - length)--^---length--^
+					if !maddr.Equal(offset(rmaddr, rmlen-length)) {
+						continue
+					}
+				}
+
+				resolved = append(resolved, rmaddr)
+			}
+
+			// consumes the rest of the multiaddr as part of the "match" process.
+			maddr = nil
+		default:
+			panic("unreachable")
+		}
+
+		if len(resolved) == 0 {
+			return nil, nil
+		} else if len(results) == 0 {
+			results = resolved
+		} else {
+			results = cross(results, resolved)
+		}
+	}
+	return results, nil
 }
 
-func (r *Resolver) resolveDns4(ctx context.Context, maddr ma.Multiaddr) ([]ma.Multiaddr, error) {
-	value, err := maddr.ValueForProtocol(Dns4Protocol.Code)
-	if err != nil {
-		return nil, fmt.Errorf("error resolving %s: %s", maddr.String(), err)
-	}
-
-	encap := ma.Split(maddr)[1:]
-
-	result := []ma.Multiaddr{}
-	records, err := r.Backend.LookupIPAddr(ctx, value)
-	if err != nil {
-		return result, err
-	}
-
-	for _, r := range records {
-		ip4 := r.IP.To4()
-		if ip4 == nil {
-			continue
-		}
-		ip4maddr, err := ma.NewMultiaddr("/ip4/" + ip4.String())
-		if err != nil {
-			return result, err
-		}
-		parts := append([]ma.Multiaddr{ip4maddr}, encap...)
-		result = append(result, ma.Join(parts...))
-	}
-	return result, nil
-}
-
-func (r *Resolver) resolveDns6(ctx context.Context, maddr ma.Multiaddr) ([]ma.Multiaddr, error) {
-	value, err := maddr.ValueForProtocol(Dns6Protocol.Code)
-	if err != nil {
-		return nil, fmt.Errorf("error resolving %s: %s", maddr.String(), err)
-	}
-
-	encap := ma.Split(maddr)[1:]
-
-	result := []ma.Multiaddr{}
-	records, err := r.Backend.LookupIPAddr(ctx, value)
-	if err != nil {
-		return result, err
-	}
-
-	for _, r := range records {
-		if r.IP.To4() != nil {
-			continue
-		}
-		ip6maddr, err := ma.NewMultiaddr("/ip6/" + r.IP.To16().String())
-		if err != nil {
-			return result, err
-		}
-		parts := append([]ma.Multiaddr{ip6maddr}, encap...)
-		result = append(result, ma.Join(parts...))
-	}
-	return result, nil
-}
-
-func (r *Resolver) resolveDnsaddr(ctx context.Context, maddr ma.Multiaddr) ([]ma.Multiaddr, error) {
-	value, err := maddr.ValueForProtocol(DnsaddrProtocol.Code)
-	if err != nil {
-		return nil, fmt.Errorf("error resolving %s: %s", maddr.String(), err)
-	}
-
-	trailer := ma.Split(maddr)[1:]
-
-	result := []ma.Multiaddr{}
-	records, err := r.Backend.LookupTXT(ctx, "_dnsaddr."+value)
-	if err != nil {
-		return result, err
-	}
-
-	for _, r := range records {
-		rv := strings.Split(r, "dnsaddr=")
-		if len(rv) != 2 {
-			continue
-		}
-
-		rmaddr, err := ma.NewMultiaddr(rv[1])
-		if err != nil {
-			return result, err
-		}
-
-		if matchDnsaddr(rmaddr, trailer) {
-			result = append(result, rmaddr)
-		}
-	}
-	return result, nil
-}
-
-// XXX probably insecure
-func matchDnsaddr(maddr ma.Multiaddr, trailer []ma.Multiaddr) bool {
-	parts := ma.Split(maddr)
-	if len(trailer) > len(parts) {
-		return false
-	}
-	if ma.Join(parts[len(parts)-len(trailer):]...).Equal(ma.Join(trailer...)) {
+func addrLen(maddr ma.Multiaddr) int {
+	length := 0
+	ma.ForEach(maddr, func(_ ma.Component) bool {
+		length++
 		return true
+	})
+	return length
+}
+
+func offset(maddr ma.Multiaddr, offset int) ma.Multiaddr {
+	_, after := ma.SplitFunc(maddr, func(c ma.Component) bool {
+		if offset == 0 {
+			return true
+		}
+		offset--
+		return false
+	})
+	return after
+}
+
+func cross(a, b []ma.Multiaddr) []ma.Multiaddr {
+	res := make([]ma.Multiaddr, 0, len(a)*len(b))
+	for _, x := range a {
+		for _, y := range b {
+			res = append(res, x.Encapsulate(y))
+		}
 	}
-	return false
+	return res
 }
