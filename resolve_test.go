@@ -104,6 +104,19 @@ func TestNonResolvable(t *testing.T) {
 	}
 }
 
+func TestLongMatch(t *testing.T) {
+	ctx := context.Background()
+	resolver := makeResolver()
+
+	res, err := resolver.Resolve(ctx, ma.StringCast("/dnsaddr/example.com/quic/quic/quic/quic"))
+	if err != nil {
+		t.Error(err)
+	}
+	if len(res) != 0 {
+		t.Error("expected no results")
+	}
+}
+
 func TestEmptyResult(t *testing.T) {
 	ctx := context.Background()
 	resolver := makeResolver()
