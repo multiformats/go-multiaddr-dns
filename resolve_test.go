@@ -35,7 +35,7 @@ func makeResolver() *Resolver {
 		},
 		TXT: map[string][]string{
 			"_dnsaddr.example.com":  []string{txta, txtb},
-			"_dnsaddr.matching.com": []string{txtc, txtd, txte},
+			"_dnsaddr.matching.com": []string{txtc, txtd, txte, "not a dnsaddr", "dnsaddr=/foobar"},
 		},
 	}
 	resolver := &Resolver{Backend: mock}
@@ -43,6 +43,14 @@ func makeResolver() *Resolver {
 }
 
 func TestMatches(t *testing.T) {
+	if !Matches(ma.StringCast("/tcp/1234/dns6/example.com")) {
+		// Pretend this is a p2p-circuit address. Unfortunately, we'd
+		// need to depend on the circuit package to parse it.
+		t.Fatalf("expected match, didn't: /tcp/1234/dns6/example.com")
+	}
+	if !Matches(ma.StringCast("/dns/example.com")) {
+		t.Fatalf("expected match, didn't: /dns/example.com")
+	}
 	if !Matches(ma.StringCast("/dns4/example.com")) {
 		t.Fatalf("expected match, didn't: /dns4/example.com")
 	}
@@ -75,6 +83,73 @@ func TestSimpleIPResolve(t *testing.T) {
 	}
 	if len(addrs6) != 2 || !addrs6[0].Equal(ip6ma) || addrs6[0].Equal(ip6mb) {
 		t.Fatalf("expected [%s %s], got %+v", ip6ma, ip6mb, addrs6)
+	}
+
+	addrs, err := resolver.Resolve(ctx, ma.StringCast("/dns/example.com"))
+	if err != nil {
+		t.Error(err)
+	}
+	for i, expected := range []ma.Multiaddr{ip4ma, ip4mb, ip6ma, ip6mb} {
+		if !expected.Equal(addrs[i]) {
+			t.Fatalf("%d: expected %s, got %s", i, expected, addrs[i])
+		}
+	}
+}
+
+func TestResolveMultiple(t *testing.T) {
+	ctx := context.Background()
+	resolver := makeResolver()
+
+	addrs, err := resolver.Resolve(ctx, ma.StringCast("/dns4/example.com/quic/dns6/example.com"))
+	if err != nil {
+		t.Error(err)
+	}
+	for i, x := range []ma.Multiaddr{ip4ma, ip4mb} {
+		for j, y := range []ma.Multiaddr{ip6ma, ip6mb} {
+			expected := ma.Join(x, ma.StringCast("/quic"), y)
+			actual := addrs[i*2+j]
+			if !expected.Equal(actual) {
+				t.Fatalf("expected %s, got %s", expected, actual)
+			}
+		}
+	}
+}
+
+func TestResolveMultipleAdjacent(t *testing.T) {
+	ctx := context.Background()
+	resolver := makeResolver()
+
+	addrs, err := resolver.Resolve(ctx, ma.StringCast("/dns4/example.com/dns6/example.com"))
+	if err != nil {
+		t.Error(err)
+	}
+	for i, x := range []ma.Multiaddr{ip4ma, ip4mb} {
+		for j, y := range []ma.Multiaddr{ip6ma, ip6mb} {
+			expected := ma.Join(x, y)
+			actual := addrs[i*2+j]
+			if !expected.Equal(actual) {
+				t.Fatalf("expected %s, got %s", expected, actual)
+			}
+		}
+	}
+}
+
+func TestResolveMultipleSandwitch(t *testing.T) {
+	ctx := context.Background()
+	resolver := makeResolver()
+
+	addrs, err := resolver.Resolve(ctx, ma.StringCast("/quic/dns4/example.com/dns6/example.com/http"))
+	if err != nil {
+		t.Error(err)
+	}
+	for i, x := range []ma.Multiaddr{ip4ma, ip4mb} {
+		for j, y := range []ma.Multiaddr{ip6ma, ip6mb} {
+			expected := ma.Join(ma.StringCast("/quic"), x, y, ma.StringCast("/http"))
+			actual := addrs[i*2+j]
+			if !expected.Equal(actual) {
+				t.Fatalf("expected %s, got %s", expected, actual)
+			}
+		}
 	}
 }
 
