@@ -13,14 +13,16 @@ var DefaultResolver = &Resolver{Backend: net.DefaultResolver}
 
 const dnsaddrTXTPrefix = "dnsaddr="
 
-type backend interface {
+type Backend interface {
 	LookupIPAddr(context.Context, string) ([]net.IPAddr, error)
 	LookupTXT(context.Context, string) ([]string, error)
 }
 
 type Resolver struct {
-	Backend backend
+	Backend Backend
 }
+
+var _ Backend = (*MockBackend)(nil)
 
 type MockBackend struct {
 	IP  map[string][]net.IPAddr
