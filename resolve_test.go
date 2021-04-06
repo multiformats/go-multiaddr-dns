@@ -29,7 +29,7 @@ var txtd = "dnsaddr=" + txtmd.String()
 var txte = "dnsaddr=" + txtme.String()
 
 func makeResolver() *Resolver {
-	mock := &MockBackend{
+	mock := &MockResolver{
 		IP: map[string][]net.IPAddr{
 			"example.com": []net.IPAddr{ip4a, ip4b, ip6a, ip6b},
 		},
@@ -38,7 +38,7 @@ func makeResolver() *Resolver {
 			"_dnsaddr.matching.com": []string{txtc, txtd, txte, "not a dnsaddr", "dnsaddr=/foobar"},
 		},
 	}
-	resolver := &Resolver{Backend: mock}
+	resolver := &Resolver{def: mock}
 	return resolver
 }
 
