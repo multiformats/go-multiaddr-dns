@@ -20,11 +20,12 @@ type BasicResolver interface {
 }
 
 // Resolver is an object capable of resolving dns multiaddrs by using one or more BasicResolvers;
-// it supports custom per TLD resolvers.
-// It also implements the BasicResolver interface so that it can act as a custom per TLD resolver.
+// it supports custom per domain/TLD resolvers.
+// It also implements the BasicResolver interface so that it can act as a custom per domain/TLD
+// resolver.
 type Resolver struct {
-	def BasicResolver
-	tld map[string]BasicResolver
+	def    BasicResolver
+	custom map[string]BasicResolver
 }
 
 var _ BasicResolver = (*Resolver)(nil)
@@ -54,23 +55,29 @@ func WithDefaultResolver(def BasicResolver) Option {
 	}
 }
 
-// WithTLDResolver specifies a custom resolver for a TLD.
-func WithTLDResolver(tld string, rslv BasicResolver) Option {
+// WithTLDResolver specifies a custom resolver for a domain/TLD.
+func WithDomainResolver(domain string, rslv BasicResolver) Option {
 	return func(r *Resolver) error {
-		r.tld[tld] = rslv
+		r.custom[domain] = rslv
 		return nil
 	}
 }
 
 func (r *Resolver) getResolver(domain string) BasicResolver {
-	parts := strings.Split(domain, ".")
-	tld := parts[len(parts)-1]
-
-	rslv, ok := r.tld[tld]
-	if !ok {
-		rslv = r.def
+	rslv, ok := r.custom[domain]
+	if ok {
+		return rslv
 	}
-	return rslv
+
+	for i := strings.Index(domain, "."); i != -1; i = strings.Index(domain, ",") {
+		domain = domain[i+1:]
+		rslv, ok = r.custom[domain]
+		if ok {
+			return rslv
+		}
+	}
+
+	return r.def
 }
 
 // Resolve resolves a DNS multiaddr.
