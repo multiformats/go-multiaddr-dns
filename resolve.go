@@ -58,6 +58,9 @@ func WithDefaultResolver(def BasicResolver) Option {
 // WithTLDResolver specifies a custom resolver for a domain/TLD.
 func WithDomainResolver(domain string, rslv BasicResolver) Option {
 	return func(r *Resolver) error {
+		if r.custom == nil {
+			r.custom = make(map[string]BasicResolver)
+		}
 		r.custom[domain] = rslv
 		return nil
 	}
