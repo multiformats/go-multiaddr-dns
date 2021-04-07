@@ -1,6 +1,7 @@
 package madns
 
 import (
+	"bytes"
 	"context"
 	"net"
 	"testing"
@@ -232,5 +233,89 @@ func TestBadDomain(t *testing.T) {
 	_, err := ma.NewMultiaddrBytes(bts)
 	if err == nil {
 		t.Error("expected malformed address to fail to parse")
+	}
+}
+
+func TestCustomResolver(t *testing.T) {
+	ip1 := net.IPAddr{IP: net.ParseIP("1.2.3.4")}
+	ip2 := net.IPAddr{IP: net.ParseIP("2.3.4.5")}
+	ip3 := net.IPAddr{IP: net.ParseIP("3.4.5.6")}
+	ip4 := net.IPAddr{IP: net.ParseIP("4.5.6.8")}
+	ip5 := net.IPAddr{IP: net.ParseIP("5.6.8.9")}
+	def := &MockResolver{
+		IP: map[string][]net.IPAddr{
+			"example.com": []net.IPAddr{ip1},
+		},
+	}
+	custom1 := &MockResolver{
+		IP: map[string][]net.IPAddr{
+			"custom.test":         []net.IPAddr{ip2},
+			"another.custom.test": []net.IPAddr{ip3},
+		},
+	}
+	custom2 := &MockResolver{
+		IP: map[string][]net.IPAddr{
+			"more.custom.test":      []net.IPAddr{ip4},
+			"some.more.custom.test": []net.IPAddr{ip5},
+		},
+	}
+
+	rslv, err := NewResolver(
+		WithDefaultResolver(def),
+		WithDomainResolver("custom.test", custom1),
+		WithDomainResolver("more.custom.test", custom2),
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	sameIP := func(ip1, ip2 net.IPAddr) bool {
+		return bytes.Equal(ip1.IP, ip2.IP)
+	}
+
+	ctx := context.Background()
+	res, err := rslv.LookupIPAddr(ctx, "example.com")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if len(res) != 1 || !sameIP(res[0], ip1) {
+		t.Fatal("expected result to be ip1")
+	}
+
+	res, err = rslv.LookupIPAddr(ctx, "custom.test")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if len(res) != 1 || !sameIP(res[0], ip2) {
+		t.Fatal("expected result to be ip2")
+	}
+
+	res, err = rslv.LookupIPAddr(ctx, "another.custom.test")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if len(res) != 1 || !sameIP(res[0], ip3) {
+		t.Fatal("expected result to be ip3")
+	}
+
+	res, err = rslv.LookupIPAddr(ctx, "more.custom.test")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if len(res) != 1 || !sameIP(res[0], ip4) {
+		t.Fatal("expected result to be ip4")
+	}
+
+	res, err = rslv.LookupIPAddr(ctx, "some.more.custom.test")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if len(res) != 1 || !sameIP(res[0], ip5) {
+		t.Fatal("expected result to be ip5")
 	}
 }
