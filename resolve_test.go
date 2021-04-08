@@ -242,6 +242,7 @@ func TestCustomResolver(t *testing.T) {
 	ip3 := net.IPAddr{IP: net.ParseIP("3.4.5.6")}
 	ip4 := net.IPAddr{IP: net.ParseIP("4.5.6.8")}
 	ip5 := net.IPAddr{IP: net.ParseIP("5.6.8.9")}
+	ip6 := net.IPAddr{IP: net.ParseIP("6.8.9.10")}
 	def := &MockResolver{
 		IP: map[string][]net.IPAddr{
 			"example.com": []net.IPAddr{ip1},
@@ -251,6 +252,7 @@ func TestCustomResolver(t *testing.T) {
 		IP: map[string][]net.IPAddr{
 			"custom.test":         []net.IPAddr{ip2},
 			"another.custom.test": []net.IPAddr{ip3},
+			"more.custom.test":    []net.IPAddr{ip6},
 		},
 	}
 	custom2 := &MockResolver{
