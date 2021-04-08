@@ -72,7 +72,7 @@ func (r *Resolver) getResolver(domain string) BasicResolver {
 		return rslv
 	}
 
-	for i := strings.Index(domain, "."); i != -1; i = strings.Index(domain, ",") {
+	for i := strings.Index(domain, "."); i != -1; i = strings.Index(domain, ".") {
 		domain = domain[i+1:]
 		rslv, ok = r.custom[domain]
 		if ok {
