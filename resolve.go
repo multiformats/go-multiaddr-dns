@@ -55,7 +55,9 @@ func WithDefaultResolver(def BasicResolver) Option {
 	}
 }
 
-// WithTLDResolver specifies a custom resolver for a domain/TLD.
+// WithDomainResolver specifies a custom resolver for a domain/TLD.
+// Custom resolver selection matches domains left to right, with more specific resolvers
+// superseding generic ones.
 func WithDomainResolver(domain string, rslv BasicResolver) Option {
 	return func(r *Resolver) error {
 		if r.custom == nil {
@@ -67,6 +69,9 @@ func WithDomainResolver(domain string, rslv BasicResolver) Option {
 }
 
 func (r *Resolver) getResolver(domain string) BasicResolver {
+	// we match left-to-right, with more specific resolvers superseding generic ones.
+	// So for a domain a.b.c, we will try a.b,c, b.c, c, and fallback to the default if
+	// there is no match
 	rslv, ok := r.custom[domain]
 	if ok {
 		return rslv
