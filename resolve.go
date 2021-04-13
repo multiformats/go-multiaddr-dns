@@ -5,6 +5,7 @@ import (
 	"net"
 	"strings"
 
+	"github.com/miekg/dns"
 	ma "github.com/multiformats/go-multiaddr"
 )
 
@@ -63,23 +64,31 @@ func WithDomainResolver(domain string, rslv BasicResolver) Option {
 		if r.custom == nil {
 			r.custom = make(map[string]BasicResolver)
 		}
-		r.custom[domain] = rslv
+		fqdn := dns.Fqdn(domain)
+		r.custom[fqdn] = rslv
 		return nil
 	}
 }
 
 func (r *Resolver) getResolver(domain string) BasicResolver {
+	fqdn := dns.Fqdn(domain)
+
 	// we match left-to-right, with more specific resolvers superseding generic ones.
 	// So for a domain a.b.c, we will try a.b,c, b.c, c, and fallback to the default if
 	// there is no match
-	rslv, ok := r.custom[domain]
+	rslv, ok := r.custom[fqdn]
 	if ok {
 		return rslv
 	}
 
-	for i := strings.Index(domain, "."); i != -1; i = strings.Index(domain, ".") {
-		domain = domain[i+1:]
-		rslv, ok = r.custom[domain]
+	for i := strings.Index(fqdn, "."); i != -1; i = strings.Index(fqdn, ".") {
+		fqdn = fqdn[i+1:]
+		if fqdn == "" {
+			// the . is the default resolver
+			break
+		}
+
+		rslv, ok = r.custom[fqdn]
 		if ok {
 			return rslv
 		}
