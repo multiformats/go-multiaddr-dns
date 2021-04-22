@@ -1,7 +1,6 @@
 package madns
 
 import (
-	"bytes"
 	"context"
 	"net"
 	"testing"
@@ -271,17 +270,13 @@ func TestCustomResolver(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	sameIP := func(ip1, ip2 net.IPAddr) bool {
-		return bytes.Equal(ip1.IP, ip2.IP)
-	}
-
 	ctx := context.Background()
 	res, err := rslv.LookupIPAddr(ctx, "example.com")
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	if len(res) != 1 || !sameIP(res[0], ip1) {
+	if len(res) != 1 || !res[0].IP.Equal(ip1.IP) {
 		t.Fatal("expected result to be ip1")
 	}
 
@@ -290,7 +285,7 @@ func TestCustomResolver(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if len(res) != 1 || !sameIP(res[0], ip2) {
+	if len(res) != 1 || !res[0].IP.Equal(ip2.IP) {
 		t.Fatal("expected result to be ip2")
 	}
 
@@ -299,7 +294,7 @@ func TestCustomResolver(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if len(res) != 1 || !sameIP(res[0], ip3) {
+	if len(res) != 1 || !res[0].IP.Equal(ip3.IP) {
 		t.Fatal("expected result to be ip3")
 	}
 
@@ -308,7 +303,7 @@ func TestCustomResolver(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if len(res) != 1 || !sameIP(res[0], ip4) {
+	if len(res) != 1 || !res[0].IP.Equal(ip4.IP) {
 		t.Fatal("expected result to be ip4")
 	}
 
@@ -317,7 +312,7 @@ func TestCustomResolver(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if len(res) != 1 || !sameIP(res[0], ip5) {
+	if len(res) != 1 || !res[0].IP.Equal(ip5.IP) {
 		t.Fatal("expected result to be ip5")
 	}
 }
