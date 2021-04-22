@@ -31,11 +31,11 @@ var txte = "dnsaddr=" + txtme.String()
 func makeResolver() *Resolver {
 	mock := &MockResolver{
 		IP: map[string][]net.IPAddr{
-			"example.com": []net.IPAddr{ip4a, ip4b, ip6a, ip6b},
+			"example.com": {ip4a, ip4b, ip6a, ip6b},
 		},
 		TXT: map[string][]string{
-			"_dnsaddr.example.com":  []string{txta, txtb},
-			"_dnsaddr.matching.com": []string{txtc, txtd, txte, "not a dnsaddr", "dnsaddr=/foobar"},
+			"_dnsaddr.example.com":  {txta, txtb},
+			"_dnsaddr.matching.com": {txtc, txtd, txte, "not a dnsaddr", "dnsaddr=/foobar"},
 		},
 	}
 	resolver := &Resolver{def: mock}
@@ -244,20 +244,20 @@ func TestCustomResolver(t *testing.T) {
 	ip6 := net.IPAddr{IP: net.ParseIP("6.8.9.10")}
 	def := &MockResolver{
 		IP: map[string][]net.IPAddr{
-			"example.com": []net.IPAddr{ip1},
+			"example.com": {ip1},
 		},
 	}
 	custom1 := &MockResolver{
 		IP: map[string][]net.IPAddr{
-			"custom.test":         []net.IPAddr{ip2},
-			"another.custom.test": []net.IPAddr{ip3},
-			"more.custom.test":    []net.IPAddr{ip6},
+			"custom.test":         {ip2},
+			"another.custom.test": {ip3},
+			"more.custom.test":    {ip6},
 		},
 	}
 	custom2 := &MockResolver{
 		IP: map[string][]net.IPAddr{
-			"more.custom.test":      []net.IPAddr{ip4},
-			"some.more.custom.test": []net.IPAddr{ip5},
+			"more.custom.test":      {ip4},
+			"some.more.custom.test": {ip5},
 		},
 	}
 
