@@ -9,7 +9,7 @@ import (
 func Matches(maddr ma.Multiaddr) (matches bool) {
 	ma.ForEach(maddr, func(c ma.Component) bool {
 		switch c.Protocol().Code {
-		case DnsProtocol.Code, Dns4Protocol.Code, Dns6Protocol.Code, DnsaddrProtocol.Code:
+		case dnsProtocol.Code, dns4Protocol.Code, dns6Protocol.Code, dnsaddrProtocol.Code:
 			matches = true
 		}
 		return !matches

@@ -9,7 +9,14 @@ import (
 	ma "github.com/multiformats/go-multiaddr"
 )
 
-var ResolvableProtocols = []ma.Protocol{DnsaddrProtocol, Dns4Protocol, Dns6Protocol, DnsProtocol}
+var (
+	dnsaddrProtocol = ma.ProtocolWithCode(ma.P_DNSADDR)
+	dns4Protocol    = ma.ProtocolWithCode(ma.P_DNS4)
+	dns6Protocol    = ma.ProtocolWithCode(ma.P_DNS6)
+	dnsProtocol     = ma.ProtocolWithCode(ma.P_DNS)
+)
+
+var ResolvableProtocols = []ma.Protocol{dnsaddrProtocol, dns4Protocol, dns6Protocol, dnsProtocol}
 var DefaultResolver = &Resolver{def: net.DefaultResolver}
 
 const dnsaddrTXTPrefix = "dnsaddr="
@@ -106,7 +113,7 @@ func (r *Resolver) Resolve(ctx context.Context, maddr ma.Multiaddr) ([]ma.Multia
 		// Find the next dns component.
 		keep, maddr = ma.SplitFunc(maddr, func(c ma.Component) bool {
 			switch c.Protocol().Code {
-			case DnsProtocol.Code, Dns4Protocol.Code, Dns6Protocol.Code, DnsaddrProtocol.Code:
+			case dnsProtocol.Code, dns4Protocol.Code, dns6Protocol.Code, dnsaddrProtocol.Code:
 				return true
 			default:
 				return false
@@ -140,12 +147,12 @@ func (r *Resolver) Resolve(ctx context.Context, maddr ma.Multiaddr) ([]ma.Multia
 		// resolve the dns component
 		var resolved []ma.Multiaddr
 		switch proto.Code {
-		case Dns4Protocol.Code, Dns6Protocol.Code, DnsProtocol.Code:
+		case dns4Protocol.Code, dns6Protocol.Code, dnsProtocol.Code:
 			// The dns, dns4, and dns6 resolver simply resolves each
 			// dns* component into an ipv4/ipv6 address.
 
-			v4only := proto.Code == Dns4Protocol.Code
-			v6only := proto.Code == Dns6Protocol.Code
+			v4only := proto.Code == dns4Protocol.Code
+			v6only := proto.Code == dns6Protocol.Code
 
 			// XXX: Unfortunately, go does a pretty terrible job of
 			// differentiating between IPv6 and IPv4. A v4-in-v6
@@ -182,7 +189,7 @@ func (r *Resolver) Resolve(ctx context.Context, maddr ma.Multiaddr) ([]ma.Multia
 				}
 				resolved = append(resolved, rmaddr)
 			}
-		case DnsaddrProtocol.Code:
+		case dnsaddrProtocol.Code:
 			// The dnsaddr resolver is a bit more complicated. We:
 			//
 			// 1. Lookup the dnsaddr txt record on _dnsaddr.DOMAIN.TLD
