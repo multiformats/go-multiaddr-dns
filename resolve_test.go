@@ -123,19 +123,28 @@ func TestResolveOnlyOnce(t *testing.T) {
 }
 
 func resolveAllDNS(ctx context.Context, resolver *Resolver, in ma.Multiaddr) ([]ma.Multiaddr, error) {
-	var inAddrs []ma.Multiaddr
-	outAddrs := []ma.Multiaddr{in}
+	if !Matches(in) {
+		return []ma.Multiaddr{in}, nil
+	}
+	var outAddrs []ma.Multiaddr
+	toResolve := []ma.Multiaddr{in}
 
-	for len(inAddrs) != len(outAddrs) {
-		inAddrs = outAddrs
-		outAddrs = nil
-		for _, inAddr := range inAddrs {
-			addrs, err := resolver.Resolve(ctx, inAddr)
+	for len(toResolve) > 0 {
+		var nextToResolve []ma.Multiaddr
+		for _, a := range toResolve {
+			addrs, err := resolver.Resolve(ctx, a)
 			if err != nil {
 				return nil, err
 			}
-			outAddrs = append(outAddrs, addrs...)
+			for _, addr := range addrs {
+				if Matches(addr) {
+					nextToResolve = append(nextToResolve, addr)
+				} else {
+					outAddrs = append(outAddrs, addr)
+				}
+			}
 		}
+		toResolve = nextToResolve
 	}
 	return outAddrs, nil
 }
