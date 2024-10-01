@@ -109,6 +109,10 @@ func (r *Resolver) getResolver(domain string) BasicResolver {
 // Resolve resolves a DNS multiaddr. It will only resolve the first DNS component in the multiaddr.
 // If you need to resolve multiple DNS components, you may call this function again with each returned address.
 func (r *Resolver) Resolve(ctx context.Context, maddr ma.Multiaddr) ([]ma.Multiaddr, error) {
+	if maddr == nil {
+		return nil, nil
+	}
+
 	// Find the next dns component.
 	preDNS, maddr := ma.SplitFunc(maddr, func(c ma.Component) bool {
 		switch c.Protocol().Code {

@@ -239,6 +239,19 @@ func TestEmptyResult(t *testing.T) {
 	}
 }
 
+func TestNil(t *testing.T) {
+	ctx := context.Background()
+	resolver := makeResolver()
+
+	addrs, err := resolver.Resolve(ctx, nil)
+	if err != nil {
+		t.Error(err)
+	}
+	if len(addrs) > 0 {
+		t.Fatalf("expected [], got %+v", addrs)
+	}
+}
+
 func TestDnsaddrMatching(t *testing.T) {
 	ctx := context.Background()
 	resolver := makeResolver()
