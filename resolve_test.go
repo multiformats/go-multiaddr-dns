@@ -3,6 +3,7 @@ package madns
 import (
 	"context"
 	"net"
+	"strconv"
 	"testing"
 
 	ma "github.com/multiformats/go-multiaddr"
@@ -361,5 +362,28 @@ func TestCustomResolver(t *testing.T) {
 
 	if len(res) != 1 || !res[0].IP.Equal(ip5.IP) {
 		t.Fatal("expected result to be ip5")
+	}
+}
+
+func TestLimitResolver(t *testing.T) {
+	var ipaddrs []net.IPAddr
+	for i := 0; i < 255; i++ {
+		ipaddrs = append(ipaddrs, net.IPAddr{IP: net.ParseIP("1.2.3." + strconv.Itoa(i))})
+	}
+
+	mock := &MockResolver{
+		IP: map[string][]net.IPAddr{
+			"example.com": ipaddrs,
+		},
+		TXT: map[string][]string{},
+	}
+	resolver := &Resolver{def: mock}
+
+	addrs, err := resolver.Resolve(context.Background(), ma.StringCast("/dns4/example.com"))
+	if err != nil {
+		t.Error(err)
+	}
+	if len(addrs) != maxResolvedAddrs {
+		t.Fatalf("expected %d, got %d", maxResolvedAddrs, len(addrs))
 	}
 }
