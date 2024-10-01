@@ -21,6 +21,8 @@ var (
 	DefaultResolver     = &Resolver{def: net.DefaultResolver}
 )
 
+const maxResolvedAddrs = 100
+
 const dnsaddrTXTPrefix = "dnsaddr="
 
 // BasicResolver is a low level interface for DNS resolution
@@ -252,6 +254,10 @@ func (r *Resolver) Resolve(ctx context.Context, maddr ma.Multiaddr) ([]ma.Multia
 
 	if len(resolved) == 0 {
 		return nil, nil
+	}
+
+	if len(resolved) > maxResolvedAddrs {
+		resolved = resolved[:maxResolvedAddrs]
 	}
 
 	if preDNS != nil {
