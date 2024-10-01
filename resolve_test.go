@@ -8,25 +8,33 @@ import (
 	ma "github.com/multiformats/go-multiaddr"
 )
 
-var ip4a = net.IPAddr{IP: net.ParseIP("192.0.2.1")}
-var ip4b = net.IPAddr{IP: net.ParseIP("192.0.2.2")}
-var ip6a = net.IPAddr{IP: net.ParseIP("2001:db8::a3")}
-var ip6b = net.IPAddr{IP: net.ParseIP("2001:db8::a4")}
+var (
+	ip4a = net.IPAddr{IP: net.ParseIP("192.0.2.1")}
+	ip4b = net.IPAddr{IP: net.ParseIP("192.0.2.2")}
+	ip6a = net.IPAddr{IP: net.ParseIP("2001:db8::a3")}
+	ip6b = net.IPAddr{IP: net.ParseIP("2001:db8::a4")}
+)
 
-var ip4ma = ma.StringCast("/ip4/" + ip4a.IP.String())
-var ip4mb = ma.StringCast("/ip4/" + ip4b.IP.String())
-var ip6ma = ma.StringCast("/ip6/" + ip6a.IP.String())
-var ip6mb = ma.StringCast("/ip6/" + ip6b.IP.String())
+var (
+	ip4ma = ma.StringCast("/ip4/" + ip4a.IP.String())
+	ip4mb = ma.StringCast("/ip4/" + ip4b.IP.String())
+	ip6ma = ma.StringCast("/ip6/" + ip6a.IP.String())
+	ip6mb = ma.StringCast("/ip6/" + ip6b.IP.String())
+)
 
-var txtmc = ma.Join(ip4ma, ma.StringCast("/tcp/123/http"))
-var txtmd = ma.Join(ip4ma, ma.StringCast("/tcp/123"))
-var txtme = ma.Join(ip4ma, ma.StringCast("/tcp/789/http"))
+var (
+	txtmc = ma.Join(ip4ma, ma.StringCast("/tcp/123/http"))
+	txtmd = ma.Join(ip4ma, ma.StringCast("/tcp/123"))
+	txtme = ma.Join(ip4ma, ma.StringCast("/tcp/789/http"))
+)
 
-var txta = "dnsaddr=" + ip4ma.String()
-var txtb = "dnsaddr=" + ip6ma.String()
-var txtc = "dnsaddr=" + txtmc.String()
-var txtd = "dnsaddr=" + txtmd.String()
-var txte = "dnsaddr=" + txtme.String()
+var (
+	txta = "dnsaddr=" + ip4ma.String()
+	txtb = "dnsaddr=" + ip6ma.String()
+	txtc = "dnsaddr=" + txtmc.String()
+	txtd = "dnsaddr=" + txtmd.String()
+	txte = "dnsaddr=" + txtme.String()
+)
 
 func makeResolver() *Resolver {
 	mock := &MockResolver{
@@ -96,11 +104,56 @@ func TestSimpleIPResolve(t *testing.T) {
 	}
 }
 
-func TestResolveMultiple(t *testing.T) {
+func TestResolveOnlyOnce(t *testing.T) {
 	ctx := context.Background()
 	resolver := makeResolver()
 
 	addrs, err := resolver.Resolve(ctx, ma.StringCast("/dns4/example.com/quic/dns6/example.com"))
+	if err != nil {
+		t.Error(err)
+	}
+
+	for i, x := range []ma.Multiaddr{ip4ma, ip4mb} {
+		expected := ma.Join(x, ma.StringCast("/quic/dns6/example.com"))
+		actual := addrs[i]
+		if !expected.Equal(actual) {
+			t.Fatalf("expected %s, got %s", expected, actual)
+		}
+	}
+}
+
+func resolveAllDNS(ctx context.Context, resolver *Resolver, in ma.Multiaddr) ([]ma.Multiaddr, error) {
+	if !Matches(in) {
+		return []ma.Multiaddr{in}, nil
+	}
+	var outAddrs []ma.Multiaddr
+	toResolve := []ma.Multiaddr{in}
+
+	for len(toResolve) > 0 {
+		var nextToResolve []ma.Multiaddr
+		for _, a := range toResolve {
+			addrs, err := resolver.Resolve(ctx, a)
+			if err != nil {
+				return nil, err
+			}
+			for _, addr := range addrs {
+				if Matches(addr) {
+					nextToResolve = append(nextToResolve, addr)
+				} else {
+					outAddrs = append(outAddrs, addr)
+				}
+			}
+		}
+		toResolve = nextToResolve
+	}
+	return outAddrs, nil
+}
+
+func TestResolveMultiple(t *testing.T) {
+	ctx := context.Background()
+	resolver := makeResolver()
+
+	addrs, err := resolveAllDNS(ctx, resolver, ma.StringCast("/dns4/example.com/quic/dns6/example.com"))
 	if err != nil {
 		t.Error(err)
 	}
@@ -115,30 +168,11 @@ func TestResolveMultiple(t *testing.T) {
 	}
 }
 
-func TestResolveMultipleAdjacent(t *testing.T) {
-	ctx := context.Background()
-	resolver := makeResolver()
-
-	addrs, err := resolver.Resolve(ctx, ma.StringCast("/dns4/example.com/dns6/example.com"))
-	if err != nil {
-		t.Error(err)
-	}
-	for i, x := range []ma.Multiaddr{ip4ma, ip4mb} {
-		for j, y := range []ma.Multiaddr{ip6ma, ip6mb} {
-			expected := ma.Join(x, y)
-			actual := addrs[i*2+j]
-			if !expected.Equal(actual) {
-				t.Fatalf("expected %s, got %s", expected, actual)
-			}
-		}
-	}
-}
-
 func TestResolveMultipleSandwitch(t *testing.T) {
 	ctx := context.Background()
 	resolver := makeResolver()
 
-	addrs, err := resolver.Resolve(ctx, ma.StringCast("/quic/dns4/example.com/dns6/example.com/http"))
+	addrs, err := resolveAllDNS(ctx, resolver, ma.StringCast("/quic/dns4/example.com/dns6/example.com/http"))
 	if err != nil {
 		t.Error(err)
 	}
@@ -197,6 +231,19 @@ func TestEmptyResult(t *testing.T) {
 	resolver := makeResolver()
 
 	addrs, err := resolver.Resolve(ctx, ma.StringCast("/dnsaddr/none.com"))
+	if err != nil {
+		t.Error(err)
+	}
+	if len(addrs) > 0 {
+		t.Fatalf("expected [], got %+v", addrs)
+	}
+}
+
+func TestNil(t *testing.T) {
+	ctx := context.Background()
+	resolver := makeResolver()
+
+	addrs, err := resolver.Resolve(ctx, nil)
 	if err != nil {
 		t.Error(err)
 	}

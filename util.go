@@ -42,16 +42,3 @@ func offset(maddr ma.Multiaddr, offset int) ma.Multiaddr {
 	})
 	return after
 }
-
-// takes the cross product of two sets of multiaddrs
-//
-// assumes `a` is non-empty.
-func cross(a, b []ma.Multiaddr) []ma.Multiaddr {
-	res := make([]ma.Multiaddr, 0, len(a)*len(b))
-	for _, x := range a {
-		for _, y := range b {
-			res = append(res, x.Encapsulate(y))
-		}
-	}
-	return res
-}
