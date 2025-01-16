@@ -387,3 +387,50 @@ func TestLimitResolver(t *testing.T) {
 		t.Fatalf("expected %d, got %d", maxResolvedAddrs, len(addrs))
 	}
 }
+
+func FuzzResolver(f *testing.F) {
+	addrs := []string{
+		"/tcp/1234/dns6/example.com",
+		"/dns/example.com",
+		"/dnsaddr/example.com/tcp/123",
+		"/dnsaddr/example.com/tcp/789/http",
+		"/dnsaddr/matching.com/tcp/789/http",
+		"/dnsaddr/example.com/quic/quic/quic/quic",
+		"/dns4/example.com/udp/789/quic/dns6/example.com",
+		"/dns6/example.com/udp/1234/quic-v1",
+		"/quic/dns4/example.com/dns6/example.com/http",
+	}
+	resolves := []string{
+		"/tcp/123",
+		"/tcp/789/http",
+		"/tcp/1234/dns6/example.com",
+		"dnsaddr=/foobar",
+		"dnsaddr=/dns/example.com",
+		"dnsaddr=/dns/matching.com/tcp/456",
+		"dnsaddr=/dns/foobar",
+	}
+	for _, a := range addrs {
+		for _, b := range resolves {
+			ma.StringCast(a)
+			f.Add(a, b)
+		}
+	}
+	f.Fuzz(func(t *testing.T, data, txt string) {
+		mock := &MockResolver{
+			IP: map[string][]net.IPAddr{
+				"example.com": {ip4a, ip4b, ip6a, ip6b},
+			},
+			TXT: map[string][]string{
+				"_dnsaddr.example.com": {txta, txtb, txt},
+				"_dnsaddr.matching.com": {txt, txtc, txtd, txte, "not a dnsaddr",
+					"dnsaddr=/foobar"},
+			},
+		}
+		resolver := &Resolver{def: mock}
+		addr, err := ma.NewMultiaddr(data)
+		if err != nil {
+			return
+		}
+		resolver.Resolve(context.Background(), addr)
+	})
+}
