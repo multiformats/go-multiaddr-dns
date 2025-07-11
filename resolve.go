@@ -278,6 +278,12 @@ func (r *Resolver) Resolve(ctx context.Context, maddr ma.Multiaddr) ([]ma.Multia
 }
 
 func (r *Resolver) LookupIPAddr(ctx context.Context, domain string) ([]net.IPAddr, error) {
+	if parts := parseP2PForgeDomain(domain); parts != nil {
+		if addrs, err := r.resolveP2PForge(ctx, domain, parts); err == nil {
+			return addrs, nil
+		}
+		// Fallback to normal resolver if synthetic offline resolution fails
+	}
 	return r.getResolver(domain).LookupIPAddr(ctx, domain)
 }
 
