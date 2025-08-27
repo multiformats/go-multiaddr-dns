@@ -1,12 +1,13 @@
 module github.com/multiformats/go-multiaddr-dns
 
 require (
+	github.com/ipfs/go-cid v0.0.7
 	github.com/miekg/dns v1.1.41
 	github.com/multiformats/go-multiaddr v0.13.0
+	github.com/multiformats/go-multicodec v0.9.2
 )
 
 require (
-	github.com/ipfs/go-cid v0.0.7 // indirect
 	github.com/klauspost/cpuid/v2 v2.2.6 // indirect
 	github.com/minio/sha256-simd v1.0.1 // indirect
 	github.com/mr-tron/base58 v1.2.0 // indirect
