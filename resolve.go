@@ -5,9 +5,33 @@ import (
 	"net"
 	"strings"
 
-	"github.com/miekg/dns"
 	ma "github.com/multiformats/go-multiaddr"
 )
+
+// isFqdn checks if s is a fully qualified domain name.
+func isFqdn(s string) bool {
+	if s == "" || s[len(s)-1] != '.' {
+		return false
+	}
+	s = s[:len(s)-1]
+	if s == "" || s[len(s)-1] != '\\' {
+		return true
+	}
+	// Check if the dot is escaped by counting backslashes
+	i := strings.LastIndexFunc(s, func(r rune) bool {
+		return r != '\\'
+	})
+	return (len(s)-i)%2 != 0
+}
+
+// fqdn returns the fully qualified domain name of s.
+// If s is already fully qualified, it is returned unchanged.
+func fqdn(s string) string {
+	if isFqdn(s) {
+		return s
+	}
+	return s + "."
+}
 
 var (
 	dnsaddrProtocol = ma.ProtocolWithCode(ma.P_DNSADDR)
@@ -75,14 +99,14 @@ func WithDomainResolver(domain string, rslv BasicResolver) Option {
 		if r.custom == nil {
 			r.custom = make(map[string]BasicResolver)
 		}
-		fqdn := dns.Fqdn(domain)
+		fqdn := fqdn(domain)
 		r.custom[fqdn] = rslv
 		return nil
 	}
 }
 
 func (r *Resolver) getResolver(domain string) BasicResolver {
-	fqdn := dns.Fqdn(domain)
+	fqdn := fqdn(domain)
 
 	// we match left-to-right, with more specific resolvers superseding generic ones.
 	// So for a domain a.b.c, we will try a.b,c, b.c, c, and fallback to the default if
