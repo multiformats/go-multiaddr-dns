@@ -387,3 +387,43 @@ func TestLimitResolver(t *testing.T) {
 		t.Fatalf("expected %d, got %d", maxResolvedAddrs, len(addrs))
 	}
 }
+
+func TestIsFqdn(t *testing.T) {
+	tests := []struct {
+		input    string
+		expected bool
+	}{
+		{"", false},
+		{".", true},
+		{"example.com", false},
+		{"example.com.", true},
+		{"example\\.com.", true},      // escaped dot in middle, real dot at end
+		{"example.com\\.", false},     // trailing dot is escaped
+		{"example.com\\\\.", true},    // escaped backslash before real dot
+		{"example.com\\\\\\.", false}, // escaped backslash + escaped dot
+	}
+	for _, tc := range tests {
+		if got := isFqdn(tc.input); got != tc.expected {
+			t.Errorf("isFqdn(%q) = %v, want %v", tc.input, got, tc.expected)
+		}
+	}
+}
+
+func TestFqdn(t *testing.T) {
+	tests := []struct {
+		input    string
+		expected string
+	}{
+		{"", "."},
+		{".", "."},
+		{"example.com", "example.com."},
+		{"example.com.", "example.com."},
+		{"example.com\\.", "example.com\\.."},    // escaped dot, needs real dot added
+		{"example.com\\\\.", "example.com\\\\."}, // already fqdn
+	}
+	for _, tc := range tests {
+		if got := fqdn(tc.input); got != tc.expected {
+			t.Errorf("fqdn(%q) = %q, want %q", tc.input, got, tc.expected)
+		}
+	}
+}
