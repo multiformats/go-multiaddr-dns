@@ -9,6 +9,9 @@ import (
 )
 
 // isFqdn checks if s is a fully qualified domain name.
+// A domain is fully qualified if it ends with an unescaped dot.
+// Escaped dots (preceded by an odd number of backslashes) do not count
+// as terminators.
 func isFqdn(s string) bool {
 	if s == "" || s[len(s)-1] != '.' {
 		return false
@@ -24,8 +27,9 @@ func isFqdn(s string) bool {
 	return (len(s)-i)%2 != 0
 }
 
-// fqdn returns the fully qualified domain name of s.
-// If s is already fully qualified, it is returned unchanged.
+// fqdn returns the fully qualified domain name of s by appending a trailing
+// dot if one is not already present. If s is already fully qualified, it is
+// returned unchanged.
 func fqdn(s string) string {
 	if isFqdn(s) {
 		return s
