@@ -59,3 +59,29 @@ func TestLookupTXTWithTTL(t *testing.T) {
 		t.Fatalf("expected unknown ttl 0 for resolver without TTL support, got %s", ttl)
 	}
 }
+
+func TestLookupTXTWithTTLDefaultResolver(t *testing.T) {
+	ctx := context.Background()
+
+	// TTL flows through when the default resolver (no per-domain match)
+	// supports it
+	withTTL := &mockTTLResolver{
+		MockResolver: &MockResolver{TXT: map[string][]string{
+			"example.com": {"dnslink=/ipfs/bafkqaaa"},
+		}},
+		ttl: 7 * time.Second,
+	}
+
+	rslv, err := NewResolver(WithDefaultResolver(withTTL))
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	_, ttl, err := rslv.LookupTXTWithTTL(ctx, "example.com")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if ttl != 7*time.Second {
+		t.Fatalf("expected ttl 7s from the default resolver, got %s", ttl)
+	}
+}

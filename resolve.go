@@ -325,10 +325,11 @@ type TXTWithTTLResolver interface {
 // a Resolver routes TXT-with-TTL lookups, so it satisfies the interface too
 var _ TXTWithTTLResolver = (*Resolver)(nil)
 
-// LookupTXTWithTTL resolves the TXT records for a domain and, when the matched
-// per-domain resolver implements [TXTWithTTLResolver], also returns their TTL.
-// Resolvers that cannot report a TTL (such as the default OS resolver) yield a
-// TTL of 0, meaning unknown.
+// LookupTXTWithTTL resolves the TXT records for a domain and, when the resolver
+// the lookup routes to (a matched per-domain resolver, or the default one
+// otherwise) implements [TXTWithTTLResolver], also returns their TTL. Resolvers
+// that cannot report a TTL (such as the default OS resolver) yield a TTL of 0,
+// meaning unknown.
 func (r *Resolver) LookupTXTWithTTL(ctx context.Context, domain string) ([]string, time.Duration, error) {
 	rslv := r.getResolver(domain)
 	if ttlRslv, ok := rslv.(TXTWithTTLResolver); ok {
